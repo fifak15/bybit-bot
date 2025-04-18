@@ -23,8 +23,8 @@ func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int)
 	}
 
 	for i := range raw {
-		raw[i].Start = raw[i].Start / 1000
-		raw[i].End = raw[i].End / 1000
+		raw[i].Start /= 1000
+		raw[i].End /= 1000
 	}
 
 	if len(raw) == 0 {
@@ -34,7 +34,6 @@ func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int)
 
 	firstBar := raw[0]
 	now := time.Now().Unix()
-
 	if firstBar.Start < 1609459200 || firstBar.Start > now+86400 {
 		log.Printf("[Маркет-данные] ОШИБКА: некорректный timestamp %d (%s)",
 			firstBar.Start,
@@ -43,7 +42,16 @@ func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int)
 	}
 
 	closed := raw[:len(raw)-1]
+	if len(closed) < required {
+		log.Printf("[Маркет-данные] ПРЕДУПРЕЖДЕНИЕ: недостаточно закрытых свечей, есть: %d, требуется: %d", len(closed), required)
+		return nil, false
+	}
+
 	bars := closed[len(closed)-required:]
+
+	for i, j := 0, len(bars)-1; i < j; i, j = i+1, j-1 {
+		bars[i], bars[j] = bars[j], bars[i]
+	}
 
 	if len(bars) > 0 {
 		firstTime := time.Unix(bars[0].Start, 0).Format("2006-01-02 15:04")

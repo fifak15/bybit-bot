@@ -31,7 +31,7 @@ type VPAScalping struct {
 const (
 	VolumeWindow    = 15  // число свечей для расчёта среднего объёма
 	LookbackPeriod  = 5   // число предыдущих свечей для оценки локального минимума/максимума
-	RiskRewardRatio = 1.5 // Тейк-Профит = риск * RiskRewardRatio
+	RiskRewardRatio = 2.0 // Тейк-Профит = риск * RiskRewardRatio
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
@@ -47,6 +47,7 @@ func (s *VPAScalping) Make(symbol, category string) {
 	}
 
 	klines, ok := s.MarketData.GetRecentKlines(symbol, "", VolumeWindow+LookbackPeriod)
+	log.Printf("asdasdadadadad %s", klines)
 	if !ok {
 		log.Printf("Недостаточно данных свечей для %s", symbol)
 		return
