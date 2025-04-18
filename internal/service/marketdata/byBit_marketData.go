@@ -23,11 +23,10 @@ func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int)
 	}
 
 	for i := range raw {
-		raw[i].Start = raw[i].Start / 1000 // Конвертируем мс -> с
-		raw[i].End = raw[i].End / 1000     // Конвертируем мс -> с
+		raw[i].Start = raw[i].Start / 1000
+		raw[i].End = raw[i].End / 1000
 	}
 
-	// Проверка данных
 	if len(raw) == 0 {
 		log.Printf("[Маркет-данные] ПРЕДУПРЕЖДЕНИЕ: пустой ответ от API")
 		return nil, false
