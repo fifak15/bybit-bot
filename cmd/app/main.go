@@ -6,6 +6,7 @@ import (
 	"bybit-bot/internal/service/account"
 	"bybit-bot/internal/service/event"
 	"bybit-bot/internal/service/exchange"
+	"bybit-bot/internal/service/marketdata"
 	"bybit-bot/internal/service/strategy"
 	"bybit-bot/internal/utils"
 	"database/sql"
@@ -17,7 +18,6 @@ import (
 )
 
 func main() {
-	// 1. Подключаемся к PostgreSQL
 	dsn := "postgres://postgres:1234@localhost:5433/postgres?sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -25,18 +25,15 @@ func main() {
 	}
 	defer db.Close()
 
-	// Проверим соединение
 	if err := db.Ping(); err != nil {
 		log.Fatalf("БД недоступна: %v", err)
 	}
 	log.Println("Подключение к PostgreSQL установлено.")
 
-	// 2. Создаём репозиторий ордеров
 	orderRepo := repository.NewOrderRepository(db)
 
 	walletRepo := repository.NewWalletRepository(db)
 
-	// 3. Инициализируем WSListener
 	wsURL := "wss://stream.bybit.com/v5/public/linear"
 	wsListener, err := event.NewWSListener(wsURL, nil)
 	if err != nil {
@@ -49,12 +46,14 @@ func main() {
 		log.Fatalf("Ошибка подписки на каналы: %v", err)
 	}
 
-	// Даем время на получение первых данных
 	time.Sleep(10 * time.Second)
 
-	// 2. Инициализируем ByBit клиент с вашими API-ключом и секретом (используйте тестовые ключи)
 	bybitClient := client.NewByBit("Cv6vQhpZDnSFROonKx", "aIJarBdglaBBDx7VHFFW9x0lKWEF4ez7mupL")
 	signalChan := strategy.NewSignalDetector()
+	marketDataService := &marketdata.ByBitMarketData{
+		Client:     bybitClient,
+		WSListener: wsListener,
+	}
 	balanceService := &account.BalanceService{
 		Bybit:            bybitClient,
 		WalletRepository: walletRepo,
@@ -66,20 +65,19 @@ func main() {
 		WalletRepository: walletRepo,
 	}
 
-	// 7. Инициализируем Formatter (для округления цен)
 	formatter := &utils.Formatter{}
 
-	// 8. Собираем стратегию маркет-мейкинга
 	strategyVPA := &strategy.VPAScalping{
 		OrderRepository:  orderRepo,
 		WalletRepository: walletRepo,
 		BalanceService:   balanceService,
 		Formatter:        formatter,
+		MarketData:       marketDataService,
 		Bybit:            bybitClient,
 		SignalDetector:   signalChan,
 		PriceCalculator:  priceCalculator,
 		WSListener:       wsListener,
-		StopLossPercent:  0.005, // например, 0.5% за порог
+		StopLossPercent:  0.005,
 	}
 
 	log.Println("Стратегия vpa_scalping запущена, ожидаем данных...")

@@ -7,10 +7,11 @@ import (
 	"bybit-bot/internal/service/account"
 	"bybit-bot/internal/service/event"
 	"bybit-bot/internal/service/exchange"
+	"bybit-bot/internal/service/marketdata"
+	"bybit-bot/internal/service/trading"
 	"bybit-bot/internal/utils"
 	"log"
 	"strings"
-	"time"
 )
 
 type VPAScalping struct {
@@ -19,18 +20,19 @@ type VPAScalping struct {
 	Formatter        *utils.Formatter
 	BalanceService   *account.BalanceService
 	PriceCalculator  *exchange.PriceCalculator
+	MarketData       marketdata.Service
 	Bybit            *client.ByBit
 	WSListener       *event.WSListener
 	StopLossPercent  float64
 	SignalDetector   *SignalDetector
+	Trading          trading.Executor
 }
 
 // Параметры стратегии
 const (
-	VolumeWindow      = 15  // число свечей для расчёта среднего объёма
-	VolumeSpikeFactor = 1.5 // коэффициент объёма, определяющий всплеск
-	LookbackPeriod    = 5   // число предыдущих свечей для оценки локального минимума/максимума
-	RiskRewardRatio   = 2.0 // Тейк-Профит = риск * RiskRewardRatio
+	VolumeWindow    = 15  // число свечей для расчёта среднего объёма
+	LookbackPeriod  = 5   // число предыдущих свечей для оценки локального минимума/максимума
+	RiskRewardRatio = 2.0 // Тейк-Профит = риск * RiskRewardRatio
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
@@ -45,8 +47,7 @@ func (s *VPAScalping) Make(symbol, category string) {
 		return
 	}
 
-	topicKline := "kline.1." + strings.ToUpper(symbol)
-	klines, ok := s.getRecentKlines(topicKline, VolumeWindow+LookbackPeriod)
+	klines, ok := s.MarketData.GetRecentKlines(symbol, "", VolumeWindow+LookbackPeriod)
 	if !ok {
 		log.Printf("Недостаточно данных свечей для %s", symbol)
 		return
@@ -109,29 +110,16 @@ func (s *VPAScalping) Make(symbol, category string) {
 
 	// 9. Размещаем ордер в зависимости от сигнала.
 	if isLong {
-		s.placeOrder(symbol, "buy", buyPriceF, quantity, stopLossBuyF, takeProfitBuyF)
+		err := s.Trading.PlaceLimitOrder(symbol, "buy", buyPriceF, quantity, stopLossBuyF, takeProfitBuyF)
+		if err != nil {
+			return
+		}
 	} else if isShort {
-		s.placeOrder(symbol, "sell", sellPriceF, quantity, stopLossSellF, takeProfitSellF)
+		err := s.Trading.PlaceLimitOrder(symbol, "sell", sellPriceF, quantity, stopLossSellF, takeProfitSellF)
+		if err != nil {
+			return
+		}
 	}
-}
-
-func (s *VPAScalping) getRecentKlines(topic string, required int) ([]model.KlineData, bool) {
-	symbol := strings.TrimPrefix(topic, "kline.1.")
-
-	raw, err := s.Bybit.GetKlines(symbol, uint64(required+1))
-	if err != nil {
-		log.Printf("REST kline fetch error for %s: %v", symbol, err)
-		return nil, false
-	}
-	if len(raw) < required+1 {
-		log.Printf("REST kline returned %d for %s, need %d+1", len(raw), symbol, required)
-		return nil, false
-	}
-
-	closed := raw[:len(raw)-1]
-
-	bars := closed[len(closed)-required:]
-	return bars, true
 }
 
 // checkAndFormatPrices приводит цены ордеров к торговым лимитам.
@@ -158,30 +146,4 @@ func (s *VPAScalping) checkAndFormatPrices(
 	takeProfitSellF := formatPrice(takeProfitSell)
 
 	return tradeLimit, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, true
-}
-
-// placeOrder размещает ордер через Bybit API и сохраняет запись в БД.
-func (s *VPAScalping) placeOrder(symbol, side string, price, quantity, stopLoss, takeProfit float64) {
-	resp, err := s.Bybit.CreateOrderViaPlaceOrderFuture(symbol, side, "limit", price, quantity, stopLoss, takeProfit)
-	if err != nil {
-		log.Printf("Ошибка размещения %s ордера для %s: %v, с ценой %f", side, symbol, err, price)
-		return
-	}
-	log.Printf("%s ордер успешно размещен для %s: %+v", strings.ToUpper(side), symbol, resp)
-
-	orderRecord := &model.Order{
-		OrderID:   resp.OrderID,
-		Symbol:    symbol,
-		Side:      side,
-		OrderType: "limit",
-		Price:     price,
-		Quantity:  quantity,
-		StopLoss:  stopLoss,
-		Status:    "open",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	if err := s.OrderRepository.InsertOrder(orderRecord); err != nil {
-		log.Printf("Ошибка сохранения ордера в БД: %v", err)
-	}
 }

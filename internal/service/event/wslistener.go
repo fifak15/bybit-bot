@@ -168,8 +168,6 @@ func (w *WSListener) GetKlinesByTopic(topic string) ([]model.KlineData, bool) {
 	return klines, ok
 }
 
-// Также можно добавить методы, которые генерируют топик по символу, если это необходимо.
-
 func (w *WSListener) Close() error {
 	log.Printf("Закрытие WebSocket-соединения")
 	return w.wsConn.Close()
