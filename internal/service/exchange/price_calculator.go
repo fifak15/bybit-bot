@@ -19,34 +19,6 @@ type PriceCalculator struct {
 	WalletRepository *repository.WalletRepository
 }
 
-/*func (pc *PriceCalculator) CalculateBuy(tradeLimit model.TradeLimits) model.BuyPrice {
-	lastKline, ok := pc.WSListener.GetKlineByTopic(tradeLimit.Symbol)
-
-	if !ok || lastKline.Open == 0 || lastKline.Close == 0 {
-		return model.BuyPrice{
-			Price: 0.00,
-			Error: errors.New(fmt.Sprintf("[%s] Current price is unknown, wait...", tradeLimit.Symbol)),
-		}
-	}
-
-	return model.BuyPrice{
-		Price: lastKline.Close,
-		Error: nil,
-	}
-}
-
-func (pc *PriceCalculator) CalculateSell(tradeLimit model.TradeLimits) (float64, error) {
-	lastKline, ok := pc.WSListener.GetKlineByTopic(tradeLimit.Symbol)
-
-	if !ok || lastKline.Open == 0 || lastKline.Close == 0 {
-		return 0.00,
-			errors.New(fmt.Sprintf("[%s] Current price is unknown, wait...", tradeLimit.Symbol))
-	}
-	currentPrice := lastKline.Close
-
-	return currentPrice, nil
-}*/
-
 func (pc *PriceCalculator) CalculateQuantity(symbol string, entryPrice, stopLossPrice float64) float64 {
 	existing, err := pc.WalletRepository.GetLatestWalletInfo("USDT")
 	if err != nil {

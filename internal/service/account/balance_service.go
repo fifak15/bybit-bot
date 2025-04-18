@@ -1,4 +1,4 @@
-package strategy
+package account
 
 import (
 	"bybit-bot/internal/client"

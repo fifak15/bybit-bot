@@ -64,7 +64,6 @@ func (w *WSListener) ListenAll() {
 				log.Printf("Ошибка чтения из WebSocket: %v", err)
 				break
 			}
-			//log.Printf("Получено сообщение: %s", string(message))
 
 			var temp struct {
 				Topic string `json:"topic"`
@@ -79,7 +78,6 @@ func (w *WSListener) ListenAll() {
 			}
 
 			w.mu.Lock()
-			// Всегда разблокируем в конце итерации
 			func() {
 				defer w.mu.Unlock()
 
@@ -93,7 +91,6 @@ func (w *WSListener) ListenAll() {
 						return
 					}
 					w.orderBookCache[temp.Topic] = &obMsg.Data
-					//log.Printf("Обновлены данные ордербука для топика: %s", temp.Topic)
 
 				} else if strings.HasPrefix(temp.Topic, "kline") {
 					var klMsg model.KlineMessage
@@ -111,7 +108,6 @@ func (w *WSListener) ListenAll() {
 
 					if len(existing) > 0 {
 						last := existing[len(existing)-1]
-						// Если это та же незакрытая свеча, просто обновляем
 						if last.Start == incoming.Start {
 							existing[len(existing)-1] = incoming
 							w.KlineCache[temp.Topic] = existing
@@ -119,7 +115,6 @@ func (w *WSListener) ListenAll() {
 							return
 						}
 					}
-					// Если пришла подтверждённая свеча или новая незакрытая, добавляем
 					existing = append(existing, incoming)
 					w.KlineCache[temp.Topic] = existing
 					log.Printf("Добавлена новая свеча (start=%d, confirm=%v) для топика %s. Всего свечей: %d", incoming.Start, incoming.Confirm, temp.Topic, len(existing))

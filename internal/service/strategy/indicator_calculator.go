@@ -1,4 +1,4 @@
-package indicators
+package strategy
 
 import (
 	"bybit-bot/internal/client"

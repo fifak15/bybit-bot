@@ -3,6 +3,7 @@ package main
 import (
 	"bybit-bot/internal/client"
 	"bybit-bot/internal/repository"
+	"bybit-bot/internal/service/account"
 	"bybit-bot/internal/service/event"
 	"bybit-bot/internal/service/exchange"
 	"bybit-bot/internal/service/strategy"
@@ -53,8 +54,8 @@ func main() {
 
 	// 2. Инициализируем ByBit клиент с вашими API-ключом и секретом (используйте тестовые ключи)
 	bybitClient := client.NewByBit("Cv6vQhpZDnSFROonKx", "aIJarBdglaBBDx7VHFFW9x0lKWEF4ez7mupL")
-
-	balanceService := &strategy.BalanceService{
+	signalChan := strategy.NewSignalDetector()
+	balanceService := &account.BalanceService{
 		Bybit:            bybitClient,
 		WalletRepository: walletRepo,
 	}
@@ -75,6 +76,7 @@ func main() {
 		BalanceService:   balanceService,
 		Formatter:        formatter,
 		Bybit:            bybitClient,
+		SignalDetector:   signalChan,
 		PriceCalculator:  priceCalculator,
 		WSListener:       wsListener,
 		StopLossPercent:  0.005, // например, 0.5% за порог
