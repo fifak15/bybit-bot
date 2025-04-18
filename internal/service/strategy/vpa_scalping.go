@@ -36,7 +36,7 @@ const (
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
-	// 1. Если открытых ордеров уже нет, продолжаем.
+
 	openOrders, err := s.Bybit.GetOpenOrders(category, symbol)
 	if err != nil {
 		log.Printf("Ошибка получения открытых ордеров для %s: %v", symbol, err)
@@ -93,7 +93,6 @@ func (s *VPAScalping) Make(symbol, category string) {
 		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f", symbol, entryPrice, stopLoss, takeProfit)
 	}
 
-	// 7. Форматируем цены по торговым лимитам.
 	_, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, ok := s.checkAndFormatPrices(
 		category, symbol, entryPrice, entryPrice, stopLoss, stopLoss, takeProfit, takeProfit,
 	)
@@ -101,14 +100,12 @@ func (s *VPAScalping) Make(symbol, category string) {
 		return
 	}
 
-	// 8. Определяем количество для ордера (на основе выбранной позиции и риск-менеджмента).
 	quantity := s.PriceCalculator.CalculateQuantity(symbol, entryPrice, stopLoss)
 	log.Printf("Рассчитанное количество для %s: %v", symbol, quantity)
 	if !s.BalanceService.CheckBalance(entryPrice, quantity, entryPrice, quantity) {
 		return
 	}
 
-	// 9. Размещаем ордер в зависимости от сигнала.
 	if isLong {
 		err := s.Trading.PlaceLimitOrder(symbol, "buy", buyPriceF, quantity, stopLossBuyF, takeProfitBuyF)
 		if err != nil {

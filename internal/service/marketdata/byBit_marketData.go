@@ -14,18 +14,32 @@ type ByBitMarketData struct {
 }
 
 func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int) ([]model.KlineData, bool) {
-	log.Printf("[Маркет-данные] Запрос свечей для %s, интервал %s, требуется %d свечей", symbol, interval, required)
+	log.Printf("[Маркет-данные] Запрос %d свечей %s, интервал '%s'", required, symbol, interval)
 
-	// Получаем сырые данные от API
 	raw, err := m.Client.GetKlines(symbol, uint64(required+1))
 	if err != nil {
-		log.Printf("[Маркет-данные] ОШИБКА: не удалось получить свечи для %s: %v", symbol, err)
+		log.Printf("[Маркет-данные] ОШИБКА запроса: %v", err)
 		return nil, false
 	}
 
-	if len(raw) < required+1 {
-		log.Printf("[Маркет-данные] ОШИБКА: получено %d свечей для %s, требуется минимум %d",
-			len(raw), symbol, required+1)
+	for i := range raw {
+		raw[i].Start = raw[i].Start / 1000 // Конвертируем мс -> с
+		raw[i].End = raw[i].End / 1000     // Конвертируем мс -> с
+	}
+
+	// Проверка данных
+	if len(raw) == 0 {
+		log.Printf("[Маркет-данные] ПРЕДУПРЕЖДЕНИЕ: пустой ответ от API")
+		return nil, false
+	}
+
+	firstBar := raw[0]
+	now := time.Now().Unix()
+
+	if firstBar.Start < 1609459200 || firstBar.Start > now+86400 {
+		log.Printf("[Маркет-данные] ОШИБКА: некорректный timestamp %d (%s)",
+			firstBar.Start,
+			time.Unix(firstBar.Start, 0).Format("2006-01-02 15:04:05"))
 		return nil, false
 	}
 
@@ -33,12 +47,10 @@ func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int)
 	bars := closed[len(closed)-required:]
 
 	if len(bars) > 0 {
-		firstTime := time.Unix(bars[0].Start, 0).Format("02.01.2006 15:04")
-		lastTime := time.Unix(bars[len(bars)-1].Start, 0).Format("02.01.2006 15:04")
-		log.Printf("[Маркет-данные] Успешно получены свечи %s: %d шт. (период %s - %s)",
-			symbol, len(bars), firstTime, lastTime)
-	} else {
-		log.Printf("[Маркет-данные] ПРЕДУПРЕЖДЕНИЕ: получен пустой набор свечей для %s", symbol)
+		firstTime := time.Unix(bars[0].Start, 0).Format("2006-01-02 15:04")
+		lastTime := time.Unix(bars[len(bars)-1].Start, 0).Format("2006-01-02 15:04")
+		log.Printf("[Маркет-данные] Успешно получено %d свечей: %s - %s",
+			len(bars), firstTime, lastTime)
 	}
 
 	return bars, true

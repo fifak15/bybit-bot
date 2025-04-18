@@ -50,7 +50,6 @@ func (sd *SignalDetector) CheckLongSignal(klines []model.KlineData) bool {
 	}
 	log.Printf("[Сигнал] Локальный минимум подтвержден (мин=%.2f)", current.Low)
 
-	// 3. Проверка бычьей свечи
 	if current.Close <= current.Open {
 		log.Printf("[Сигнал] Не бычья свеча (открытие=%.2f, закрытие=%.2f)",
 			current.Open, current.Close)
@@ -59,14 +58,22 @@ func (sd *SignalDetector) CheckLongSignal(klines []model.KlineData) bool {
 	log.Printf("[Сигнал] Бычья свеча подтверждена (открытие=%.2f, закрытие=%.2f)",
 		current.Open, current.Close)
 
-	// 4. Фильтр SMA20
-	closes := sd.getClosingPrices(klines[n-20 : n-1])
+	if n < 20 {
+		log.Printf("[Сигнал] Недостаточно данных для SMA20: имеем %d, нужно 20", n)
+		return false
+	}
+
+	last20 := klines[n-20 : n]
+	closes := sd.getClosingPrices(last20)
+	log.Printf("[Сигнал] closes: %v", closes)
+
 	sma20Results := talib.Sma(closes, 20)
 	if len(sma20Results) == 0 {
 		log.Printf("[Сигнал] Ошибка расчета SMA20")
 		return false
 	}
 	sma20 := sma20Results[len(sma20Results)-1]
+	log.Printf("[Сигнал] sma20: %.2f", sma20)
 
 	if current.Close <= sma20 {
 		log.Printf("[Сигнал] Цена ниже SMA20 (цена=%.2f, sma20=%.2f)",
@@ -149,10 +156,10 @@ func (sd *SignalDetector) calculateAverageVolume(klines []model.KlineData) float
 	return total / float64(len(klines))
 }
 
-func (sd *SignalDetector) getClosingPrices(klines []model.KlineData) []float64 {
-	closes := make([]float64, len(klines))
-	for i, k := range klines {
-		closes[i] = k.Close
+func (sd *SignalDetector) getClosingPrices(kl []model.KlineData) []float64 {
+	out := make([]float64, len(kl))
+	for i, k := range kl {
+		out[i] = k.Close
 	}
-	return closes
+	return out
 }
