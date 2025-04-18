@@ -1,4 +1,4 @@
-package marketdata
+package interfaces
 
 import "bybit-bot/internal/model"
 

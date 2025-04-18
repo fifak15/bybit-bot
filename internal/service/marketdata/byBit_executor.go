@@ -1,4 +1,4 @@
-package trading
+package marketdata
 
 import (
 	"bybit-bot/internal/client"

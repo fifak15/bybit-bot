@@ -36,7 +36,6 @@ type ByBit struct {
 	cacheMu          sync.RWMutex
 }
 
-// NewByBit создает и инициализирует клиента Bybit с заданными API-ключами и секретом.
 func NewByBit(apiKey, apiSecret string) *ByBit {
 	client := &bybit.Bybit{}
 	client.SetDefaults()

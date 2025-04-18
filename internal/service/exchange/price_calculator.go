@@ -19,25 +19,29 @@ type PriceCalculator struct {
 	WalletRepository *repository.WalletRepository
 }
 
-func (pc *PriceCalculator) CalculateQuantity(symbol string, entryPrice, stopLossPrice float64) float64 {
-	existing, err := pc.WalletRepository.GetLatestWalletInfo("USDT")
+func (pc *PriceCalculator) CalculateQuantity(symbol string, entryPrice float64) float64 {
+	balance, err := pc.WalletRepository.GetLatestWalletInfo("USDT")
 	if err != nil {
-		log.Printf("Ошибка получения данных баланса: %v", err)
-		return 0.0
+		log.Printf("[Риск-менеджмент] Ошибка получения баланса: %v", err)
+		return 0
 	}
 
-	riskPerUnit := math.Abs(entryPrice - stopLossPrice)
-	if riskPerUnit == 0 {
-		log.Printf("Ошибка расчёта: разница между ценой входа и стоп‑лоссом равна нулю для %s", symbol)
-		return 0.0
-	}
+	maxPositionPercent := 0.10 // 10% от баланса
+	positionSize := balance.WalletBalance * maxPositionPercent
+	quantity := positionSize / entryPrice
 
-	riskCapital := existing.WalletBalance * 0.01
-	quantity := riskCapital / riskPerUnit
+	quantityRounded := math.Round(quantity*10000) / 10000
 
-	quantityRounded := math.Round(quantity*100) / 100
+	log.Printf("[Риск-менеджмент] %s:\n"+
+		"  Баланс: %.2f USDT\n"+
+		"  Цена входа: %.2f\n"+
+		"  Объем позиции: %.4f BTC\n"+
+		"  Стоимость позиции: %.2f USDT",
+		symbol,
+		balance.WalletBalance,
+		entryPrice,
+		quantityRounded,
+		quantityRounded*entryPrice)
 
-	log.Printf("Для %s: availableFunds=%.2f, riskCapital=%.2f, riskPerUnit=%.2f, quantity=%.6f, roundedQuantity=%.2f",
-		symbol, existing.WalletBalance, riskCapital, riskPerUnit, quantity, quantityRounded)
 	return quantityRounded
 }

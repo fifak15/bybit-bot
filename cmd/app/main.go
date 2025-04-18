@@ -50,9 +50,15 @@ func main() {
 
 	bybitClient := client.NewByBit("Cv6vQhpZDnSFROonKx", "aIJarBdglaBBDx7VHFFW9x0lKWEF4ez7mupL")
 	signalChan := strategy.NewSignalDetector()
+
 	marketDataService := &marketdata.ByBitMarketData{
 		Client:     bybitClient,
 		WSListener: wsListener,
+	}
+
+	trading := &marketdata.ByBitExecutor{
+		API:  bybitClient,
+		Repo: orderRepo,
 	}
 	balanceService := &account.BalanceService{
 		Bybit:            bybitClient,
@@ -77,6 +83,7 @@ func main() {
 		SignalDetector:   signalChan,
 		PriceCalculator:  priceCalculator,
 		WSListener:       wsListener,
+		Trading:          trading,
 		StopLossPercent:  0.005,
 	}
 
@@ -84,21 +91,16 @@ func main() {
 
 	for {
 		strategyVPA.Make("BTCUSDT", "linear")
-		time.Sleep(30 * time.Second)
+		time.Sleep(20 * time.Second)
 	}
 
 }
 func init() {
-	// Открываем (или создаём) файл в текущей папке
 	f, err := os.OpenFile("vpa_scalping.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		log.Fatalf("не удалось открыть лог-файл: %v", err)
 	}
-
-	// Чтобы логи шли одновременно и в консоль, и в файл:
 	mw := io.MultiWriter(os.Stdout, f)
 	log.SetOutput(mw)
-
-	// (опционально) добавить префикс и флаги времени:
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
