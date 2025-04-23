@@ -16,7 +16,7 @@ type ByBitMarketData struct {
 func (m *ByBitMarketData) GetRecentKlines(symbol, interval string, required int) ([]model.KlineData, bool) {
 	log.Printf("[Маркет-данные] Запрос %d свечей %s, интервал '%s'", required, symbol, interval)
 
-	raw, err := m.Client.GetKlines(symbol, uint64(required+1))
+	raw, err := m.Client.GetKlines(symbol, interval, uint64(required+1))
 	if err != nil {
 		log.Printf("[Маркет-данные] ОШИБКА запроса: %v", err)
 		return nil, false

@@ -14,6 +14,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/types"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -63,16 +64,26 @@ func NewByBit(apiKey, apiSecret string) *ByBit {
 	}
 }
 
-// GetKlines возвращает свечные данные для заданного символа.
-func (b *ByBit) GetKlines(symbol string, limit uint64) ([]model.KlineData, error) {
-	log.Printf("limit!!!?: %v", limit)
+func (b *ByBit) GetKlines(symbol, intervalStr string, limit uint64) ([]model.KlineData, error) {
 	ctx := context.Background()
 	category := "linear"
-	interval := kline.OneMin
-	startTime := time.Now().Add(-time.Duration(limit) * time.Minute)
+	var intervalEnum kline.Interval
+	var intervalMinutes int
+	switch intervalStr {
+	case "1":
+		intervalEnum = kline.OneMin
+		intervalMinutes = 1
+	case "5":
+		intervalEnum = kline.FiveMin
+		intervalMinutes = 5
+	default:
+		return nil, fmt.Errorf("unsupported interval: %s", intervalStr)
+	}
+
+	startTime := time.Now().Add(-time.Duration(limit*uint64(intervalMinutes)) * time.Minute)
 	endTime := time.Now()
 
-	raw, err := b.client.GetKlines(ctx, category, symbol, interval, startTime, endTime, limit)
+	raw, err := b.client.GetKlines(ctx, category, symbol, intervalEnum, startTime, endTime, limit)
 	if err != nil {
 		return nil, fmt.Errorf("error getting Klines: %w", err)
 	}
@@ -90,7 +101,7 @@ func (b *ByBit) GetKlines(symbol string, limit uint64) ([]model.KlineData, error
 		out = append(out, model.KlineData{
 			Start:     startMs,
 			End:       endMs,
-			Interval:  "1",
+			Interval:  strconv.Itoa(int(intervalEnum)),
 			Open:      it.Open,
 			High:      it.High,
 			Low:       it.Low,
@@ -370,22 +381,22 @@ func (b *ByBit) CreateOrderViaPlaceOrderFuture(symbol, side, orderType string, p
 		Price:          price,
 		ReduceOnly:     false,
 		CloseOnTrigger: false,
-		TpslMode:       "Partial",
+		TpslMode:       "Full",
 	}
 
 	if stopLoss > 0 || takeProfit > 0 {
 		if takeProfit > 0 {
 			arg.TakeProfitPrice = takeProfit
-			arg.TakeProfitTriggerBy = "LastPrice"
+			arg.TakeProfitTriggerBy = "MarkPrice"
 		}
 		if stopLoss > 0 {
 			arg.StopLossPrice = stopLoss
-			arg.StopLossTriggerBy = "LastPrice"
-			arg.SlLimitPrice = stopLoss
-			arg.SlOrderType = orderTypeToString(order.Limit)
+			arg.StopLossTriggerBy = "MarkPrice"
+			// Для рыночного SL НЕ указываем SlLimitPrice:
+			arg.SlOrderType = orderTypeToString(order.Market)
+			// arg.SlLimitPrice — удалено
 		}
 	}
-
 	if b.client.API.Endpoints != nil {
 		log.Printf("Отправка ордера на URL: %v", b.client.API.Endpoints)
 	} else {

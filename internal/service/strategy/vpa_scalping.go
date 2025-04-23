@@ -11,6 +11,7 @@ import (
 	"bybit-bot/internal/utils"
 	"log"
 	"strings"
+	"time"
 )
 
 type VPAScalping struct {
@@ -23,30 +24,37 @@ type VPAScalping struct {
 	Bybit            *client.ByBit
 	WSListener       *event.WSListener
 	StopLossPercent  float64
+	RiskMang         *exchange.R
 	SignalDetector   *SignalDetector
 	Trading          interfaces.Executor
 }
 
 // Параметры стратегии
 const (
-	VolumeWindow    = 15  // число свечей для расчёта среднего объёма
-	LookbackPeriod  = 5   // число предыдущих свечей для оценки локального минимума/максимума
-	RiskRewardRatio = 2.0 // Тейк-Профит = риск * RiskRewardRatio
+	VolumeWindow   = 18 // число свечей для расчёта среднего объёма
+	LookbackPeriod = 10 // число предыдущих свечей для оценки локального минимума/максимума
+)
+const (
+	DefaultStopLossPct   = 0.00050 // 0.05%
+	DefaultTakeProfitPct = 0.0015  // 0.15%
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
-
+	/*if !s.IsTradingTime() {
+		log.Printf("Вне торгового времени: пропускаем %s", symbol)
+		return
+	}*/
 	openOrders, err := s.Bybit.GetOpenOrders(category, symbol)
 	if err != nil {
 		log.Printf("Ошибка получения открытых ордеров для %s: %v", symbol, err)
 		return
 	}
 	if openOrders != nil && len(openOrders.Orders) > 0 {
-		log.Printf("Для %s уже есть открытые ордера (%d шт.), пропускаем стратегию", symbol, len(openOrders.Orders))
+		log.Printf("Пропускаем %s: ошибка=%v, открытых ордеров=%d", symbol, err, len(openOrders.Orders))
 		return
 	}
 
-	klines, ok := s.MarketData.GetRecentKlines(symbol, "", VolumeWindow+LookbackPeriod)
+	klines, ok := s.MarketData.GetRecentKlines(symbol, "1", VolumeWindow+LookbackPeriod)
 	log.Printf("asdasdadadadad %s", klines)
 	if !ok {
 		log.Printf("Недостаточно данных свечей для %s", symbol)
@@ -78,16 +86,18 @@ func (s *VPAScalping) Make(symbol, category string) {
 
 	currentCandle := klines[len(klines)-1]
 	var entryPrice, stopLoss, takeProfit float64
+	entryPrice = currentCandle.Close
+
 	if isLong {
-		entryPrice = currentCandle.Close
-		stopLoss = currentCandle.Low * 0.995
-		takeProfit = entryPrice + (entryPrice-stopLoss)*RiskRewardRatio
-		log.Printf("LONG сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f", symbol, entryPrice, stopLoss, takeProfit)
+		stopLoss = entryPrice * (1 - DefaultStopLossPct)
+		takeProfit = entryPrice * (1 + DefaultTakeProfitPct)
+		log.Printf("LONG сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
+			symbol, entryPrice, stopLoss, takeProfit)
 	} else {
-		entryPrice = currentCandle.Close
-		stopLoss = currentCandle.High * 1.005
-		takeProfit = entryPrice - (stopLoss-entryPrice)*RiskRewardRatio
-		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f", symbol, entryPrice, stopLoss, takeProfit)
+		stopLoss = entryPrice * (1 + DefaultStopLossPct)
+		takeProfit = entryPrice * (1 - DefaultTakeProfitPct)
+		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
+			symbol, entryPrice, stopLoss, takeProfit)
 	}
 
 	_, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, ok := s.checkAndFormatPrices(
@@ -140,4 +150,11 @@ func (s *VPAScalping) checkAndFormatPrices(category, symbol string, buyPrice, se
 	takeProfitSellF := formatPrice(takeProfitSell)
 
 	return tradeLimit, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, true
+}
+
+func (s *VPAScalping) IsTradingTime() bool {
+	now := time.Now().UTC()
+	hour := now.Hour()
+
+	return (hour >= 7 && hour < 16) || (hour >= 13 && hour < 22)
 }

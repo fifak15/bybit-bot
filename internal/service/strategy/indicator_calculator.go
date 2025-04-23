@@ -141,7 +141,7 @@ func (ic *IndicatorCalculator) MACD(symbol string, fastPeriod, slowPeriod, signa
 
 // Вспомогательные методы
 func (ic *IndicatorCalculator) getKLines(symbol string, limit int) ([]model.KlineData, error) {
-	klines, err := ic.Bybit.GetKlines(symbol, uint64(limit))
+	klines, err := ic.Bybit.GetKlines(symbol, "1", uint64(limit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get klines: %v", err)
 	}
