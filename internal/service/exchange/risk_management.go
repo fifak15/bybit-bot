@@ -10,7 +10,7 @@ import (
 
 // Параметры риск‑менеджмента
 const (
-	atrPeriod              = 9
+	atrPeriod              = 11
 	stopLossATRMul         = 1.0    // сколько ATR в расстоянии до SL
 	riskRewardRatio        = 2.0    // коэффициент RRR
 	minSLPercent           = 0.001  // 0.1%
