@@ -26,11 +26,11 @@ func (pc *PriceCalculator) CalculateQuantity(symbol string, entryPrice float64) 
 		return 0
 	}
 
-	maxPositionPercent := 0.10 // 10% от баланса
+	maxPositionPercent := 0.10
 	positionSize := balance.WalletBalance * maxPositionPercent
 	quantity := positionSize / entryPrice
 
-	quantityRounded := math.Round(quantity*100) / 100
+	quantityRounded := math.Round(quantity*1000) / 1000
 
 	log.Printf("[Риск-менеджмент] %s:\n"+
 		"  Баланс: %.2f USDT\n"+

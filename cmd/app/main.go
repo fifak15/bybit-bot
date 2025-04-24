@@ -46,7 +46,7 @@ func main() {
 		log.Fatalf("Ошибка подписки на каналы: %v", err)
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	bybitClient := client.NewByBit("Cv6vQhpZDnSFROonKx", "aIJarBdglaBBDx7VHFFW9x0lKWEF4ez7mupL")
 	signalChan := strategy.NewSignalDetector()

@@ -3,7 +3,6 @@ package strategy
 import (
 	"bybit-bot/internal/client"
 	"bybit-bot/internal/interfaces"
-	"bybit-bot/internal/model"
 	"bybit-bot/internal/repository"
 	"bybit-bot/internal/service/account"
 	"bybit-bot/internal/service/event"
@@ -24,7 +23,6 @@ type VPAScalping struct {
 	Bybit            *client.ByBit
 	WSListener       *event.WSListener
 	StopLossPercent  float64
-	RiskMang         *exchange.R
 	SignalDetector   *SignalDetector
 	Trading          interfaces.Executor
 }
@@ -33,10 +31,6 @@ type VPAScalping struct {
 const (
 	VolumeWindow   = 18 // число свечей для расчёта среднего объёма
 	LookbackPeriod = 10 // число предыдущих свечей для оценки локального минимума/максимума
-)
-const (
-	DefaultStopLossPct   = 0.00050 // 0.05%
-	DefaultTakeProfitPct = 0.0015  // 0.15%
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
@@ -89,18 +83,16 @@ func (s *VPAScalping) Make(symbol, category string) {
 	entryPrice = currentCandle.Close
 
 	if isLong {
-		stopLoss = entryPrice * (1 - DefaultStopLossPct)
-		takeProfit = entryPrice * (1 + DefaultTakeProfitPct)
-		log.Printf("LONG сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
+		stopLoss, takeProfit = exchange.CalculateSLTP("long", entryPrice, klines)
+		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
 			symbol, entryPrice, stopLoss, takeProfit)
 	} else {
-		stopLoss = entryPrice * (1 + DefaultStopLossPct)
-		takeProfit = entryPrice * (1 - DefaultTakeProfitPct)
+		takeProfit, stopLoss = exchange.CalculateSLTP("short", entryPrice, klines)
 		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
 			symbol, entryPrice, stopLoss, takeProfit)
 	}
 
-	_, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, ok := s.checkAndFormatPrices(
+	_, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, ok := s.BalanceService.CheckAndFormatPrices(
 		category, symbol, entryPrice, entryPrice, stopLoss, stopLoss, takeProfit, takeProfit,
 	)
 	if !ok {
@@ -126,30 +118,6 @@ func (s *VPAScalping) Make(symbol, category string) {
 			return
 		}
 	}
-}
-
-// checkAndFormatPrices приводит цены ордеров к торговым лимитам.
-func (s *VPAScalping) checkAndFormatPrices(category, symbol string, buyPrice, sellPrice, stopLossBuy, stopLossSell,
-	takeProfitBuy, takeProfitSell float64) (model.TradeLimits, float64, float64, float64, float64, float64, float64, bool) {
-
-	tradeLimit, err := s.Bybit.GetTradeLimitsViaInstruments(category, symbol)
-	if err != nil {
-		log.Printf("Ошибка получения торговых лимитов: %v", err)
-		return tradeLimit, 0, 0, 0, 0, 0, 0, false
-	}
-
-	formatPrice := func(price float64) float64 {
-		return s.Formatter.FormatPrice(tradeLimit, price)
-	}
-
-	buyPriceF := formatPrice(buyPrice)
-	sellPriceF := formatPrice(sellPrice)
-	stopLossBuyF := formatPrice(stopLossBuy)
-	stopLossSellF := formatPrice(stopLossSell)
-	takeProfitBuyF := formatPrice(takeProfitBuy)
-	takeProfitSellF := formatPrice(takeProfitSell)
-
-	return tradeLimit, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, true
 }
 
 func (s *VPAScalping) IsTradingTime() bool {

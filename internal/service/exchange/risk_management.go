@@ -1,23 +1,26 @@
 package exchange
 
 import (
-	"bybit-bot/internal/model"
 	"github.com/markcheno/go-talib"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
+	"log"
+
+	"bybit-bot/internal/model"
 )
 
+// Параметры риск‑менеджмента
 const (
-	ATRPeriod             = 14
-	StopLossATRMultiplier = 1.0 // во сколько ATR задаём стоп-лосс
-	RiskRewardRatio       = 2.0 // тейк-профит = distance * R
+	atrPeriod              = 9
+	stopLossATRMul         = 1.0    // сколько ATR в расстоянии до SL
+	riskRewardRatio        = 2.0    // коэффициент RRR
+	minSLPercent           = 0.001  // 0.1%
+	maxSLPercent           = 0.01   // 1%
+	spreadAdjustmentFactor = 0.0005 // 0.05%
 )
 
-// RiskManagement формирует RiskManagementModes на основе переданных параметров стоп‑лосса и тейк‑профита.
-// Если значение stopLoss или takeProfit больше 0, соответствующий режим включается.
+// RiskManagement формирует режимы StopLoss и TakeProfit для ордера
 func RiskManagement(stopLoss, takeProfit float64) order.RiskManagementModes {
-	rm := order.RiskManagementModes{
-		Mode: "Full",
-	}
+	rm := order.RiskManagementModes{Mode: "Full"}
 	if takeProfit > 0 {
 		rm.TakeProfit = order.RiskManagement{
 			Enabled:          true,
@@ -38,33 +41,63 @@ func RiskManagement(stopLoss, takeProfit float64) order.RiskManagementModes {
 	return rm
 }
 
-// CalculateSLTP даёт динамический стоп-лосс и тейк-профит для лонга/шорта.
-// side = "long" или "short".
-func CalculateSLTP(side string, entryPrice float64, klines []model.KlineData) (stopLoss, takeProfit float64) {
+func CalculateSLTP(side string, entry float64, klines []model.KlineData) (sl, tp float64) {
 	n := len(klines)
-	if n < ATRPeriod+1 {
-		return entryPrice * 0.995, entryPrice * 1.005
+	if n < atrPeriod+1 {
+		sl = entry * (1 - minSLPercent)
+		tp = entry * (1 + minSLPercent*riskRewardRatio)
+		log.Printf("[RM] Недостаточно данных для ATR (%d баров), SL=%.8f, TP=%.8f", n, sl, tp)
+		return
 	}
 
-	highs := make([]float64, ATRPeriod+1)
-	lows := make([]float64, ATRPeriod+1)
-	closes := make([]float64, ATRPeriod+1)
-	for i := 0; i <= ATRPeriod; i++ {
-		k := klines[n-ATRPeriod-1+i]
-		highs[i] = k.High
-		lows[i] = k.Low
-		closes[i] = k.Close
+	// Собираем OHLC для расчёта ATR
+	h := make([]float64, atrPeriod+1)
+	l := make([]float64, atrPeriod+1)
+	c := make([]float64, atrPeriod+1)
+	for i := 0; i <= atrPeriod; i++ {
+		bar := klines[n-atrPeriod-1+i]
+		h[i], l[i], c[i] = bar.High, bar.Low, bar.Close
 	}
-	atrArr := talib.Atr(highs, lows, closes, ATRPeriod)
+	atrArr := talib.Atr(h, l, c, atrPeriod)
 	atr := atrArr[len(atrArr)-1]
+	log.Printf("[RM] ATR(%d)=%.8f", atrPeriod, atr)
 
-	distance := atr * StopLossATRMultiplier
-	if side == "long" {
-		stopLoss = entryPrice - distance
-		takeProfit = entryPrice + distance*RiskRewardRatio
-	} else {
-		stopLoss = entryPrice + distance
-		takeProfit = entryPrice - distance*RiskRewardRatio
+	// Расстояние до SL с учётом min/max и спреда
+	rawDist := atr * stopLossATRMul
+	minDist := entry * minSLPercent
+	maxDist := entry * maxSLPercent
+	d := clamp(rawDist, minDist, maxDist)
+	d += entry * spreadAdjustmentFactor
+	log.Printf("[RM] Dist(raw=%.8f,min=%.8f,max=%.8f,spread=%.8f)=%.8f", rawDist, minDist, maxDist, entry*spreadAdjustmentFactor, d)
+
+	switch side {
+	case "long":
+		sl = entry - d
+		tp = entry + d*riskRewardRatio
+		log.Printf("[LONG] Entry=%.8f → SL=%.8f, TP=%.8f", entry, sl, tp)
+
+	case "short":
+		sl = entry + d
+		tp = entry - d*riskRewardRatio
+		if tp >= entry {
+			tp = entry - d*riskRewardRatio
+			log.Printf("[SHORT] TP>=Entry, пересчитан TP=%.8f", tp)
+		}
+		log.Printf("[SHORT] Entry=%.8f → SL=%.8f, TP=%.8f", entry, sl, tp)
+
+	default:
+		sl, tp = entry, entry
+		log.Printf("[RM] Неизвестный side='%s', SL=Entry, TP=Entry", side)
 	}
 	return
+}
+
+func clamp(x, min, max float64) float64 {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
 }

@@ -80,3 +80,26 @@ func (b *BalanceService) CheckBalance(buyPrice, buyQuantity, sellPrice, sellQuan
 	}
 	return true
 }
+
+func (b *BalanceService) CheckAndFormatPrices(category, symbol string, buyPrice, sellPrice, stopLossBuy, stopLossSell,
+	takeProfitBuy, takeProfitSell float64) (model.TradeLimits, float64, float64, float64, float64, float64, float64, bool) {
+
+	tradeLimit, err := b.Bybit.GetTradeLimitsViaInstruments(category, symbol)
+	if err != nil {
+		log.Printf("Ошибка получения торговых лимитов: %v", err)
+		return tradeLimit, 0, 0, 0, 0, 0, 0, false
+	}
+
+	formatPrice := func(price float64) float64 {
+		return s.Formatter.FormatPrice(tradeLimit, price)
+	}
+
+	buyPriceF := formatPrice(buyPrice)
+	sellPriceF := formatPrice(sellPrice)
+	stopLossBuyF := formatPrice(stopLossBuy)
+	stopLossSellF := formatPrice(stopLossSell)
+	takeProfitBuyF := formatPrice(takeProfitBuy)
+	takeProfitSellF := formatPrice(takeProfitSell)
+
+	return tradeLimit, buyPriceF, sellPriceF, stopLossBuyF, stopLossSellF, takeProfitBuyF, takeProfitSellF, true
+}

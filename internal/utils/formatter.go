@@ -3,7 +3,6 @@ package utils
 import (
 	"bybit-bot/internal/model"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -67,37 +66,4 @@ func (m *Formatter) ToFixed(num float64, precision int) float64 {
 
 func (m *Formatter) Floor(num float64) int64 {
 	return int64(math.Floor(num))
-}
-
-func (m *Formatter) ByBitSideToBinanceSide(side string) string {
-	switch side {
-	case "Sell":
-		return "SELL"
-	case "Buy":
-		return "BUY"
-	default:
-		log.Panicf("Side %s is not supported by ByBitSideToBinanceSide", side)
-	}
-
-	return ""
-}
-
-func (m *Formatter) ByBitTypeToBinanceType(orderType string) string {
-	switch orderType {
-	case "Limit":
-		return "LIMIT"
-	default:
-		log.Panicf("Order type %s is not supported by ByBitTypeToBinanceType", orderType)
-	}
-
-	return ""
-}
-
-func (m *Formatter) ByBitSymbolStatusToBinanceSymbolStatus(status string) string {
-	switch status {
-	case "Trading":
-		return "TRADING"
-	}
-
-	return ""
 }
