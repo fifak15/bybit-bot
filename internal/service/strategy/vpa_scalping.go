@@ -87,7 +87,7 @@ func (s *VPAScalping) Make(symbol, category string) {
 		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
 			symbol, entryPrice, stopLoss, takeProfit)
 	} else {
-		takeProfit, stopLoss = exchange.CalculateSLTP("short", entryPrice, klines)
+		stopLoss, takeProfit = exchange.CalculateSLTP("short", entryPrice, klines)
 		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
 			symbol, entryPrice, stopLoss, takeProfit)
 	}

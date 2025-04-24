@@ -91,7 +91,7 @@ func main() {
 
 	for {
 		strategyVPA.Make("BTCUSDT", "linear")
-		time.Sleep(20 * time.Second)
+		time.Sleep(13 * time.Second)
 	}
 
 }

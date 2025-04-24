@@ -6,7 +6,6 @@ import (
 	"log"
 )
 
-// SignalDetector отвечает за обнаружение торговых сигналов
 type SignalDetector struct {
 	volumeWindow      int
 	volumeSpikeFactor float64

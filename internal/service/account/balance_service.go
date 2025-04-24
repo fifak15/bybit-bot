@@ -4,6 +4,7 @@ import (
 	"bybit-bot/internal/client"
 	"bybit-bot/internal/model"
 	"bybit-bot/internal/repository"
+	"bybit-bot/internal/utils"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/bybit"
 	"log"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 type BalanceService struct {
 	Bybit            *client.ByBit
 	WalletRepository *repository.WalletRepository
+	Format           *utils.Formatter
 }
 
 func ParseAvailableFunds(balance *bybit.WalletBalance, coin string) float64 {
@@ -91,7 +93,7 @@ func (b *BalanceService) CheckAndFormatPrices(category, symbol string, buyPrice,
 	}
 
 	formatPrice := func(price float64) float64 {
-		return s.Formatter.FormatPrice(tradeLimit, price)
+		return b.Format.FormatPrice(tradeLimit, price)
 	}
 
 	buyPriceF := formatPrice(buyPrice)
