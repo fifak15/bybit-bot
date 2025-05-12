@@ -9,7 +9,7 @@ import (
 	"bybit-bot/internal/service/exchange"
 	"bybit-bot/internal/utils"
 	"log"
-	"strings"
+	"math"
 	"time"
 )
 
@@ -22,15 +22,14 @@ type VPAScalping struct {
 	MarketData       interfaces.Service
 	Bybit            *client.ByBit
 	WSListener       *event.WSListener
-	StopLossPercent  float64
 	SignalDetector   *SignalDetector
 	Trading          interfaces.Executor
 }
 
 // Параметры стратегии
 const (
-	VolumeWindow   = 18 // число свечей для расчёта среднего объёма
-	LookbackPeriod = 10 // число предыдущих свечей для оценки локального минимума/максимума
+	VolumeWindow   = 120 // число свечей для расчёта среднего объёма
+	LookbackPeriod = 100 // число предыдущих свечей для оценки локального минимума/максимума
 )
 
 func (s *VPAScalping) Make(symbol, category string) {
@@ -43,25 +42,23 @@ func (s *VPAScalping) Make(symbol, category string) {
 		log.Printf("Ошибка получения открытых ордеров для %s: %v", symbol, err)
 		return
 	}
+
 	if openOrders != nil && len(openOrders.Orders) > 0 {
 		log.Printf("Пропускаем %s: ошибка=%v, открытых ордеров=%d", symbol, err, len(openOrders.Orders))
 		return
 	}
 
-	klines, ok := s.MarketData.GetRecentKlines(symbol, "1", VolumeWindow+LookbackPeriod)
-	log.Printf("asdasdadadadad %s", klines)
+	klines, ok := s.MarketData.GetRecentKlines(symbol, "30", VolumeWindow+LookbackPeriod)
 	if !ok {
 		log.Printf("Недостаточно данных свечей для %s", symbol)
 		return
 	}
 
-	topicOrderbook := "orderbook.50." + strings.ToUpper(symbol)
-	orderBook, ok := s.WSListener.GetOrderbookByTopic(topicOrderbook)
+	orderBook, ok := s.WSListener.GetOrderbookByTopic("orderbook.50.BTCUSDT")
 	if !ok || len(orderBook.Bids) == 0 || len(orderBook.Asks) == 0 {
 		log.Printf("Недостаточно данных ордербука для %s", symbol)
 		return
 	}
-
 	isLong := s.SignalDetector.CheckLongSignal(klines)
 	log.Printf("isLong %s", isLong)
 	isShort := s.SignalDetector.CheckShortSignal(klines)
@@ -80,11 +77,17 @@ func (s *VPAScalping) Make(symbol, category string) {
 
 	currentCandle := klines[len(klines)-1]
 	var entryPrice, stopLoss, takeProfit float64
+
 	entryPrice = currentCandle.Close
+	delta := math.Abs(midPrice-entryPrice) / entryPrice
+	if delta > 0.002 {
+		log.Printf("Отклонение midPrice слишком велико (%.4f), пропуск", delta)
+		return
+	}
 
 	if isLong {
 		stopLoss, takeProfit = exchange.CalculateSLTP("long", entryPrice, klines)
-		log.Printf("SHORT сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
+		log.Printf("LONG сигнал для %s: Entry=%.2f, StopLoss=%.2f, TakeProfit=%.2f",
 			symbol, entryPrice, stopLoss, takeProfit)
 	} else {
 		stopLoss, takeProfit = exchange.CalculateSLTP("short", entryPrice, klines)

@@ -84,7 +84,6 @@ func main() {
 		PriceCalculator:  priceCalculator,
 		WSListener:       wsListener,
 		Trading:          trading,
-		StopLossPercent:  0.005,
 	}
 
 	log.Println("Стратегия vpa_scalping запущена, ожидаем данных...")
@@ -95,6 +94,7 @@ func main() {
 	}
 
 }
+
 func init() {
 	f, err := os.OpenFile("vpa_scalping.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {

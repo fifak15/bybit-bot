@@ -73,9 +73,9 @@ func (b *ByBit) GetKlines(symbol, intervalStr string, limit uint64) ([]model.Kli
 	case "1":
 		intervalEnum = kline.OneMin
 		intervalMinutes = 1
-	case "5":
-		intervalEnum = kline.FiveMin
-		intervalMinutes = 5
+	case "30":
+		intervalEnum = kline.ThirtyMin
+		intervalMinutes = 30
 	default:
 		return nil, fmt.Errorf("unsupported interval: %s", intervalStr)
 	}
